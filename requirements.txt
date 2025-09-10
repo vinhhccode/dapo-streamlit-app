@@ -9,7 +9,7 @@ alpaca-trade-api
 datasets
 huggingface_hub
 gymnasium
-box2d-py
+box2d-py==2.3.8
 stable-baselines3[extra]
 wrds
 exchange_calendars
