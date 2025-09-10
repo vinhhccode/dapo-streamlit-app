@@ -11,7 +11,6 @@ huggingface_hub
 gymnasium
 stable-baselines3[extra]
 wrds
-box2d-py==2.3.8
 exchange_calendars
 selenium
 webdriver-manager
