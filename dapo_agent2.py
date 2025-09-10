@@ -699,7 +699,7 @@ st.set_page_config(
 )
 
 # Data Paths
-DATA_DIR = ".data"
+DATA_DIR = "./data"
 BACKGROUND_PATH = os.path.join(DATA_DIR, "background.png")
 BIG_LOGO_PATH = os.path.join(DATA_DIR, "big_logo.png")
 BANNER_PATH = os.path.join(DATA_DIR, "banner.png")
