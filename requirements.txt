@@ -9,6 +9,7 @@ alpaca-trade-api
 datasets
 huggingface_hub
 gymnasium
+box2d-py==2.3.8
 stable-baselines3[extra]
 wrds
 exchange_calendars
@@ -20,7 +21,4 @@ openpyxl
 scipy
 tqdm
 alpha_vantage==2.3.1
-transformers
-underthesea
-vncorenlp
 git+https://github.com/AI4Finance-Foundation/FinRL.git
