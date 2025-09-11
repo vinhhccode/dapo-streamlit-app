@@ -564,7 +564,7 @@ def plot_final_allocation_treemap(df_allocations, model_name):
             textfont=dict(size=10, family="Arial Black")
         )
         fig.update_layout(
-            title=f"Phân bổ Danh mục Trung bình Cuối kỳ - Model: {model_name}",
+            title=f"Phân bổ Danh mục Trung bình Cuối kỳ dạng Treemap - Model: {model_name}",
             width=1000,
             height=800,
             plot_bgcolor='rgba(0,0,0,0)',
@@ -692,7 +692,7 @@ def run_backtest(start_date, end_date):
 
 # Config
 st.set_page_config(
-    page_title="DRL + News Sentiment Application for Portfolio Optimization",
+    page_title="Application of Deep Reinforcement Learning Models Integrating News Signals and Tail-Risk Hedging in Portfolio Management on the Vietnamese Stock Market",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -844,7 +844,7 @@ if st.session_state.page == "Main":
         initial_amount = st.session_state.initial_amount
         final_amount = st.session_state.assets[-1]
         st.write(f"**Số tiền ban đầu**: ${initial_amount:,.2f}")
-        st.write(f"**Số tiền đạt được sau backtest (trung bình)**: ${final_amount:,.2f}")
+        st.write(f"**Số tiền đạt được sau backtest **: ${final_amount:,.2f}")
 
         st.write("--- Bảng các chỉ số hiệu suất ---")
         metrics = st.session_state.metrics
@@ -871,6 +871,23 @@ if st.session_state.page == "Main":
         df_metrics = df_metrics.set_index("Chỉ số").reindex(desired_order).reset_index()
         st.table(df_metrics)
 
+            # Thêm giải thích cách ứng dụng hoạt động
+        st.markdown("""
+    ### Hệ thống phân bổ danh mục hoạt động như thế nào?
+
+    - **AI nhìn thị trường**: Mô hình DAPO xem giá cổ phiếu, xu hướng thị trường, tâm lý (sentiment), và rủi ro (risk) tích hợp kiểm soát rủi ro đuôi.
+    - **Quyết định mua/bán**: DAPO chọn mua hoặc bán bao nhiêu cổ phiếu (ví dụ: mua 100 cổ phiếu A, bán 50 cổ phiếu B) để tối ưu lợi nhuận và giảm rủi ro.
+    - **Cập nhật danh mục**: Sau mỗi ngày, hệ thống tính lại:
+        - Tiền mặt còn lại.
+        - Số cổ phiếu đang giữ.
+        - Giá trị từng cổ phiếu (số cổ phiếu × giá).
+    - **Tính tỷ trọng cuối cùng**:
+        - Tổng giá trị danh mục = tiền mặt + giá trị tất cả cổ phiếu.
+        - Tỷ trọng (%) = (giá trị mỗi cổ phiếu hoặc tiền mặt) ÷ tổng giá trị.
+        - Ví dụ: Nếu danh mục trị giá 1 triệu, cổ phiếu A trị giá 200,000, thì A chiếm 20%.
+    - **Lấy trung bình**: Chạy mô hình nhiều lần để đảm bảo kết quả ổn định, rồi lấy trung bình tỷ trọng.
+    - **Kết quả**: Bạn được bảng tỷ trọng cuối kỳ trong giai đoạn bạn chọn backtest (ví dụ: 20% cổ phiếu A, 30% cổ phiếu B, 50% tiền mặt) và biểu đồ hình cây (treemap) để dễ hình dung.
+    """)
         st.write("--- Bảng Phân bổ Danh mục Trung bình Cuối kỳ (%) ---")
         st.dataframe(st.session_state.df_allocations)
 
@@ -889,56 +906,38 @@ elif st.session_state.page == "Explain & Guide":
     st.markdown("""
     ### Giải thích về kiểm soát rủi ro đo bằng cách penalty thêm rủi ro đuôi (tail risk penalty) dựa trên CVaR vào mô hình của chúng tôi
 
-    🚨 **Vấn đề**
+     **Vấn đề**
 
     Trong giao dịch chứng khoán, một chiến lược có thể tạo lợi nhuận trung bình cao, nhưng lại rất dễ thua lỗ nặng trong những ngày xấu nhất.
     Ví dụ:
-
     Bình thường mỗi ngày bạn lời +1%.
-
     Nhưng thỉnh thoảng lại có ngày lỗ tận -20%.
-
     Nếu chỉ nhìn trung bình thì thấy “ổn”, nhưng rủi ro thật sự lại nằm ở đuôi phân phối lợi nhuận – tức những ngày cực kỳ xấu.
 
-    📉 **VaR (Value at Risk)**
+     **VaR (Value at Risk)**
 
     VaR (5%) nghĩa là: trong 100 ngày giao dịch, có 5 ngày tệ nhất thì lỗ sẽ không vượt quá một mức nào đó.
-
     Ví dụ: VaR 5% = -10% ⇒ 95 ngày bình thường thì lỗ không quá 10%.
 
-    🧮 **CVaR (Conditional Value at Risk)**
+     **CVaR (Conditional Value at Risk)**
 
     CVaR đi xa hơn VaR: nó đo mức lỗ trung bình trong những ngày tệ nhất.
-
     Ví dụ: nếu 5 ngày tệ nhất lần lượt lỗ: -10%, -12%, -15%, -18%, -20%
-
     VaR 5% = -10%
-
     CVaR 5% = (-12% -15% -18% -20%) / 4 = -16.25%
     👉 Tức là, nếu rơi vào “vùng rủi ro đuôi”, bạn trung bình sẽ lỗ 16.25%, nặng hơn nhiều so với chỉ nhìn VaR.
 
-    🛡️ **Tail Risk Penalty trong code**
-
+     **Tail Risk Penalty trong code**
     Trong môi trường giao dịch này:
-
     Mỗi bước, hệ thống tính lợi nhuận tài khoản.
+    Sau đó ước tính CVaR trong một khoảng thời gian gần đây (ví dụ 30 ngày). Nếu CVaR cho thấy có nguy cơ thua lỗ lớn ở đuôi phân phối, thì phần thưởng (reward) sẽ bị trừ thêm một khoản penalty. Nói cách khác:
+    - Chiến lược nào kiếm lời đều nhưng hay gặp cú sập mạnh ⇒ sẽ bị phạt nặng.
+    - Chiến lược nào ổn định, ít rủi ro đuôi ⇒ được thưởng cao hơn.
 
-    Sau đó ước tính CVaR trong một khoảng thời gian gần đây (ví dụ 30 ngày).
-
-    Nếu CVaR cho thấy có nguy cơ thua lỗ lớn ở đuôi phân phối, thì phần thưởng (reward) sẽ bị trừ thêm một khoản penalty.
-
-    Nói cách khác:
-
-    Chiến lược nào kiếm lời đều nhưng hay gặp cú sập mạnh ⇒ sẽ bị phạt nặng.
-
-    Chiến lược nào ổn định, ít rủi ro đuôi ⇒ được thưởng cao hơn.
-
-    🎯 **Ý nghĩa**
+     **Ý nghĩa**
 
     Mục tiêu của penalty này là:
-
     Khuyến khích mô hình RL không chỉ chạy theo lợi nhuận trung bình, mà còn tránh những chiến lược liều lĩnh, dễ sập mạnh.
-
     Kết quả: mô hình sẽ hướng đến lợi nhuận bền vững, ít cú sốc lớn, giống như cách các quỹ đầu tư chuyên nghiệp quản trị rủi ro.
     """)
 
@@ -946,68 +945,54 @@ elif st.session_state.page == "Explain & Guide":
     st.markdown("""
     ### Giải thích về DAPO
 
-    🚀 **Lợi ích của DAPO so với PPO truyền thống**
+     **Lợi ích của DAPO so với PPO truyền thống**
     
     1. **Dynamic Sampling (lấy nhiều hành động thay vì một)**
 
     Trong PPO truyền thống: mỗi trạng thái (state) chỉ được lấy một hành động rồi huấn luyện.
-
     Trong DAPO: mỗi trạng thái có thể sinh ra nhiều hành động khác nhau từ cùng một policy, rồi so sánh với nhau.
 
     👉 Lợi ích:
-
+    
     Mô hình hiểu rõ hơn hành động nào tốt hơn trong cùng một hoàn cảnh.
-
     Giảm sự “may rủi” do ngẫu nhiên (random action).
-
     Học nhanh hơn và ổn định hơn.
 
     2. **Group Advantage (so sánh trong nhóm hành động)**
 
     PPO chỉ tính lợi thế (advantage) so với baseline chung.
-
     DAPO tính lợi thế tương đối giữa các hành động trong cùng một trạng thái.
 
     👉 Lợi ích:
 
     Hành động tốt hơn trong nhóm sẽ được “khuyến khích mạnh”, còn hành động kém thì “bị phạt rõ ràng”.
-
     Giúp policy học ra đường đi chính xác hơn, tránh bị mơ hồ.
 
     3. **Decoupled Clipping (tách biên trên/dưới khi update)**
-
     PPO gốc dùng một hệ số kẹp (clipping) ±ε để tránh update quá đà.
-
     DAPO tách riêng ngưỡng trên và ngưỡng dưới (epsilon_high, epsilon_low).
 
     👉 Lợi ích:
 
     Kiểm soát tốt hơn khi nào nên “giới hạn update” (khi lợi thế quá cao hoặc quá thấp).
-
     Tránh hiện tượng policy “ngừng học” do clipping quá chặt.
-
     Linh hoạt hơn cho các thị trường biến động mạnh như chứng khoán.
 
     4. **Tích hợp Risk và Sentiment**
 
     DAPO không chỉ dựa vào lợi nhuận mà còn dùng thêm risk penalty và sentiment boost.
-
     Reward được điều chỉnh thông minh:
-
     Risk cao → bị phạt.
-
     Sentiment tích cực → được thưởng thêm.
 
     👉 Lợi ích:
 
     Giúp mô hình thực tế hơn khi áp dụng vào tài chính (vì ngoài lợi nhuận, nhà đầu tư thật cũng cân nhắc rủi ro và tâm lý thị trường).
-
     Tránh chiến lược liều lĩnh kiểu “cờ bạc”.
 
     5. **Huấn luyện song song (MPI + GPU)**
 
     DAPO hỗ trợ huấn luyện nhiều process (multi-core, multi-GPU).
-
     Đồng bộ tham số tự động qua MPI.
 
     👉 Lợi ích:
