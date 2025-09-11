@@ -692,7 +692,7 @@ def run_backtest(start_date, end_date):
 
 # Config
 st.set_page_config(
-    page_title="Application of Deep Reinforcement Learning Models Integrating News Signals and Tail-Risk Hedging in Portfolio Management on the Vietnamese Stock Market",
+    page_title="DAPO_APP news signals and CVAR",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -820,7 +820,7 @@ try:
 except FileNotFoundError:
     st.warning("Banner không tìm thấy. Vui lòng kiểm tra file `banner.png`.")
 
-st.markdown('<h1 class="custom-title">Deep Reinforcement Learning with News Sentiment Integration</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="custom-title">Application of Deep Reinforcement Learning Models Integrating News Signals and Tail-Risk Hedging in Portfolio Management on the Vietnamese Stock Market</h1>', unsafe_allow_html=True)
 
 
 # MAIN CONTENT
