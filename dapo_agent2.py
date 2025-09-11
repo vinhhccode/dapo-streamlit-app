@@ -18,6 +18,7 @@ import base64
 from scipy.stats import skew, kurtosis
 from finrl.config import INDICATORS
 import os
+from typing import Sequence, Optional
 
 # Global device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -584,18 +585,35 @@ def run_backtest(start_date, end_date):
         st.error(f"Lỗi: Không tìm thấy file dữ liệu: {e}")
         return None, None, None, None
 
+    # Chuẩn hóa cột và định dạng ngày
     for df in (trade_risk, trade_sent, past_data):
         df["date"] = pd.to_datetime(df["date"], errors='coerce')
         df.dropna(subset=['date'], inplace=True)
 
-    trade = pd.merge(trade_risk, trade_sent, on=["date", "tic"], suffixes=("", "_sent"), how="left")
+    # Gộp dữ liệu từ PAST_DATA_PATH với trade_risk và trade_sent
+    # Đảm bảo các cột cần thiết có mặt
+    base_cols = ["date", "tic", "close"] + INDICATORS
+    for df in (trade_risk, trade_sent, past_data):
+        for col in base_cols:
+            if col not in df.columns:
+                df[col] = 0.0 if col != "date" and col != "tic" else df.get(col, None)
+
+    # Gộp trade_risk và trade_sent trước
+    trade = pd.merge(trade_risk, trade_sent, on=["date", "tic"], suffixes=("", "_sent"), how="outer")
+    
+    # Gộp với past_data
+    trade = pd.concat([trade, past_data], ignore_index=True)
+    
+    # Xử lý các cột llm_sentiment và llm_risk
     if "llm_sentiment_sent" in trade.columns:
         trade["llm_sentiment"] = trade["llm_sentiment_sent"].fillna(3)
         trade.drop(columns=["llm_sentiment_sent"], inplace=True)
     for col in ["llm_sentiment", "llm_risk"]:
         if col not in trade.columns:
             trade[col] = 3
+        trade[col] = trade[col].fillna(3)
 
+    # Lọc dữ liệu theo khoảng thời gian
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
     trade = trade[(trade["date"] >= start_date) & (trade["date"] <= end_date)].copy()
@@ -604,6 +622,7 @@ def run_backtest(start_date, end_date):
         st.error(f"Lỗi: Không có dữ liệu giao dịch từ {start_date} đến {end_date}.")
         return None, None, None, None
 
+    # Tạo chỉ số ngày duy nhất
     uniq_dates = trade["date"].sort_values().unique()
     date_to_idx = {d: i for i, d in enumerate(uniq_dates)}
     trade["new_idx"] = trade["date"].map(date_to_idx)
@@ -722,68 +741,66 @@ def add_bg_from_local(image_file):
             .stApp {{
                 background-image: url(data:image/png;base64,{encoded});
                 background-size: cover;
-                background-color: rgba(255, 255, 255, 0.5); /* Reduced opacity for sharper background */
-                background-blend-mode: lighten; /* Changed to lighten for clearer background */
+                background-color: rgba(255, 255, 255, 0.5);
+                background-blend-mode: lighten;
             }}
             .custom-title {{
-                color: #00D4FF; /* Electric blue for a techy feel */
-                font-family: 'Orbitron', sans-serif; /* Futuristic font */
+                color: #00D4FF;
+                font-family: 'Orbitron', sans-serif;
                 font-weight: 700;
-                text-shadow: 0 0 10px rgba(0, 212, 255, 0.7); /* Neon glow effect */
+                text-shadow: 0 0 10px rgba(0, 212, 255, 0.7);
             }}
             .stMarkdown, .stText {{
-                color: #E6E6FA !important; /* Light lavender for text readability */
+                color: #E6E6FA !important;
             }}
             .stButton > button {{
                 font-weight: bold !important;
                 font-size: 20px !important;
-                color: #00D4FF !important; /* Electric blue text */
-                background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent dark background */
-                border: 2px solid #00D4FF !important; /* Neon blue border */
+                color: #00D4FF !important;
+                background-color: rgba(0, 0, 0, 0.7);
+                border: 2px solid #00D4FF !important;
                 border-radius: 5px !important;
                 transition: all 0.3s ease !important;
-                box-shadow: 0 0 8px rgba(0, 212, 255, 0.5); /* Subtle glow */
+                box-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
             }}
             .stButton > button:hover {{
-                background-color: #00D4FF !important; /* Neon blue on hover */
+                background-color: #00D4FF !important;
                 color: #000000 !important;
-                box-shadow: 0 0 12px rgba(0, 212, 255, 0.8); /* Stronger glow on hover */
+                box-shadow: 0 0 12px rgba(0, 212, 255, 0.8);
             }}
             .stDateInput > label {{
                 font-size: 20px !important;
                 font-weight: bold !important;
-                color: #00D4FF !important; /* Electric blue for labels */
-                font-family: 'Roboto Mono', monospace; /* Techy font for labels */
+                color: #00D4FF !important;
+                font-family: 'Roboto Mono', monospace;
             }}
-            /* Sidebar Styling */
             [data-testid="stSidebar"] {{
-                background-color: rgba(0, 0, 50, 0.9); /* Dark navy semi-transparent background */
-                border-right: 2px solid #00D4FF; /* Neon blue border */
-                box-shadow: 0 0 10px rgba(0, 212, 255, 0.5); /* Sidebar glow */
+                background-color: rgba(0, 0, 50, 0.9);
+                border-right: 2px solid #00D4FF;
+                box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
             }}
             [data-testid="stSidebar"] .stRadio > label {{
-                font-family: 'Roboto Mono', monospace; /* Techy font */
-                color: #E6E6FA; /* Light lavender text */
+                font-family: 'Roboto Mono', monospace;
+                color: #E6E6FA;
                 font-size: 18px;
                 padding: 10px;
                 border-radius: 5px;
-                background: linear-gradient(45deg, rgba(0, 212, 255, 0.2), rgba(0, 0, 50, 0.2)); /* Gradient background */
+                background: linear-gradient(45deg, rgba(0, 212, 255, 0.2), rgba(0, 0, 50, 0.2));
                 transition: all 0.3s ease;
             }}
             [data-testid="stSidebar"] .stRadio > label:hover {{
-                background: linear-gradient(45deg, rgba(0, 212, 255, 0.5), rgba(0, 0, 50, 0.5)); /* Brighter gradient on hover */
+                background: linear-gradient(45deg, rgba(0, 212, 255, 0.5), rgba(0, 0, 50, 0.5));
                 color: #FFFFFF;
-                box-shadow: 0 0 8px rgba(0, 212, 255, 0.7); /* Hover glow */
+                box-shadow: 0 0 8px rgba(0, 212, 255, 0.7);
             }}
             [data-testid="stSidebar"] .stRadio > label > div > input:checked + div {{
-                background-color: #00D4FF !important; /* Neon blue for selected radio */
+                background-color: #00D4FF !important;
                 border-color: #FFFFFF !important;
             }}
             </style>
             """,
             unsafe_allow_html=True,
         )
-        # Add Google Fonts for techy fonts
         st.markdown(
             """
             <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -820,22 +837,28 @@ try:
 except FileNotFoundError:
     st.warning("Banner không tìm thấy. Vui lòng kiểm tra file `banner.png`.")
 
-st.markdown('<h1 class="custom-title">Application of Deep Reinforcement Learning Models Integrating News Signals and Tail-Risk Hedging in Portfolio Management on the Vietnamese Stock Market</h1>', unsafe_allow_html=True)
-
+st.markdown('<h1 class="custom-title">Ứng dụng Mô hình Học Sâu Tăng Cường Tích hợp Tín hiệu Tin tức và Phòng ngừa Rủi ro Đuôi trong Quản lý Danh mục Đầu tư trên Thị trường Chứng khoán Việt Nam</h1>', unsafe_allow_html=True)
 
 # MAIN CONTENT
 if st.session_state.page == "Main":
     st.success("📊 Đây là trang chính. Vui lòng chọn khoảng thời gian để chạy backtest.")
     
-    st.subheader(":red[SELECT THE RESEARCH PERIOD]")
+    st.subheader(":red[CHỌN KHOẢNG THỜI GIAN NGHIÊN CỨU]")
     st.markdown("Vui lòng chọn khoảng thời gian để chạy backtest. Khoảng thời gian phải nằm trong phạm vi dữ liệu và kéo dài ít nhất 4 tuần.")
 
     try:
+        # Tải dữ liệu để xác định khoảng thời gian
         trade_risk = pd.read_excel(RISK_DATA_PATH, engine="openpyxl")
-        trade_risk["date"] = pd.to_datetime(trade_risk["date"], errors='coerce')
-        trade_risk.dropna(subset=['date'], inplace=True)
-        min_date = trade_risk["date"].min().date()
-        max_date = trade_risk["date"].max().date()
+        trade_sent = pd.read_excel(SENTIMENT_DATA_PATH, engine="openpyxl")
+        past_data = pd.read_excel(PAST_DATA_PATH, engine="openpyxl")
+
+        for df in (trade_risk, trade_sent, past_data):
+            df["date"] = pd.to_datetime(df["date"], errors='coerce')
+            df.dropna(subset=['date'], inplace=True)
+
+        # Tìm ngày sớm nhất và muộn nhất từ tất cả các nguồn dữ liệu
+        min_date = min(trade_risk["date"].min(), trade_sent["date"].min(), past_data["date"].min()).date()
+        max_date = max(trade_risk["date"].max(), trade_sent["date"].max(), past_data["date"].max()).date()
     except FileNotFoundError:
         min_date = datetime.today().date() - timedelta(days=365)
         max_date = datetime.today().date()
@@ -846,9 +869,9 @@ if st.session_state.page == "Main":
 
     col1, col2 = st.columns(2)
     with col1:
-        start_date = st.date_input(":red[Choose start date]", value=default_start_date, min_value=min_date, max_value=max_date)
+        start_date = st.date_input(":red[Chọn ngày bắt đầu]", value=default_start_date, min_value=min_date, max_value=max_date)
     with col2:
-        end_date = st.date_input(":red[Choose end date]", value=default_end_date, min_value=min_date, max_value=max_date)
+        end_date = st.date_input(":red[Chọn ngày kết thúc]", value=default_end_date, min_value=min_date, max_value=max_date)
 
     today = datetime.today().date()
     st.info(f"Khoảng thời gian đã chọn: **{start_date if start_date else 'None'} → {end_date if end_date else 'None'}**")
@@ -865,7 +888,7 @@ if st.session_state.page == "Main":
         else:
             st.success(f"Bạn đã chọn khoảng thời gian từ {start_date} đến {end_date}")
 
-            if st.button("Run Backtest", use_container_width=True):
+            if st.button("Chạy Backtest", use_container_width=True):
                 with st.spinner("Đang chạy backtest..."):
                     st.session_state.backtest_run = True
                     assets, dates, metrics, df_allocations = run_backtest(start_date, end_date)
@@ -877,11 +900,11 @@ if st.session_state.page == "Main":
                         st.session_state.initial_amount = 1_000_000
 
     if "backtest_run" in st.session_state and st.session_state.backtest_run:
-        st.subheader(":red[Backtest Results]")
+        st.subheader(":red[Kết quả Backtest]")
         initial_amount = st.session_state.initial_amount
         final_amount = st.session_state.assets[-1]
         st.write(f"**Số tiền ban đầu**: ${initial_amount:,.2f}")
-        st.write(f"**Số tiền đạt được sau backtest **: ${final_amount:,.2f}")
+        st.write(f"**Số tiền đạt được sau backtest**: ${final_amount:,.2f}")
 
         st.write("--- Bảng các chỉ số hiệu suất ---")
         metrics = st.session_state.metrics
@@ -908,133 +931,126 @@ if st.session_state.page == "Main":
         df_metrics = df_metrics.set_index("Chỉ số").reindex(desired_order).reset_index()
         st.table(df_metrics)
 
-            # Thêm giải thích cách ứng dụng hoạt động
         st.markdown("""
-    ### Hệ thống phân bổ danh mục hoạt động như thế nào?
+        ### Hệ thống phân bổ danh mục hoạt động như thế nào?
 
-    - **AI nhìn thị trường**: Mô hình DAPO xem giá cổ phiếu, xu hướng thị trường, tâm lý (sentiment), và rủi ro (risk) tích hợp kiểm soát rủi ro đuôi.
-    - **Quyết định mua/bán**: DAPO chọn mua hoặc bán bao nhiêu cổ phiếu (ví dụ: mua 100 cổ phiếu A, bán 50 cổ phiếu B) để tối ưu lợi nhuận và giảm rủi ro.
-    - **Cập nhật danh mục**: Sau mỗi ngày, hệ thống tính lại:
-        - Tiền mặt còn lại.
-        - Số cổ phiếu đang giữ.
-        - Giá trị từng cổ phiếu (số cổ phiếu × giá).
-    - **Tính tỷ trọng cuối cùng**:
-        - Tổng giá trị danh mục = tiền mặt + giá trị tất cả cổ phiếu.
-        - Tỷ trọng (%) = (giá trị mỗi cổ phiếu hoặc tiền mặt) ÷ tổng giá trị.
-        - Ví dụ: Nếu danh mục trị giá 1 triệu, cổ phiếu A trị giá 200,000, thì A chiếm 20%.
-    - **Lấy trung bình**: Chạy mô hình nhiều lần để đảm bảo kết quả ổn định, rồi lấy trung bình tỷ trọng.
-    - **Kết quả**: Bạn được bảng tỷ trọng cuối kỳ trong giai đoạn bạn chọn backtest (ví dụ: 20% cổ phiếu A, 30% cổ phiếu B, 50% tiền mặt) và biểu đồ hình cây (treemap) để dễ hình dung.
-    """)
+        - **AI nhìn thị trường**: Mô hình DAPO xem giá cổ phiếu, xu hướng thị trường, tâm lý (sentiment), và rủi ro (risk) tích hợp kiểm soát rủi ro đuôi.
+        - **Quyết định mua/bán**: DAPO chọn mua hoặc bán bao nhiêu cổ phiếu (ví dụ: mua 100 cổ phiếu A, bán 50 cổ phiếu B) để tối ưu lợi nhuận và giảm rủi ro.
+        - **Cập nhật danh mục**: Sau mỗi ngày, hệ thống tính lại:
+            - Tiền mặt còn lại.
+            - Số cổ phiếu đang giữ.
+            - Giá trị từng cổ phiếu (số cổ phiếu × giá).
+        - **Tính tỷ trọng cuối cùng**:
+            - Tổng giá trị danh mục = tiền mặt + giá trị tất cả cổ phiếu.
+            - Tỷ trọng (%) = (giá trị mỗi cổ phiếu hoặc tiền mặt) ÷ tổng giá trị.
+            - Ví dụ: Nếu danh mục trị giá 1 triệu, cổ phiếu A trị giá 200,000, thì A chiếm 20%.
+        - **Lấy trung bình**: Chạy mô hình nhiều lần để đảm bảo kết quả ổn định, rồi lấy trung bình tỷ trọng.
+        - **Kết quả**: Bạn được bảng tỷ trọng cuối kỳ trong giai đoạn bạn chọn backtest (ví dụ: 20% cổ phiếu A, 30% cổ phiếu B, 50% tiền mặt) và biểu đồ hình cây (treemap) để dễ hình dung.
+        """)
         st.write("--- Bảng Phân bổ Danh mục Trung bình Cuối kỳ (%) ---")
         st.dataframe(st.session_state.df_allocations)
 
         plot_final_allocation_treemap(st.session_state.df_allocations, "DAPO (Cvar 0.01 Phobert 1a.3b)")
 
 elif st.session_state.page == "Explain & Guide":
-    st.subheader(":red[Explain & Guide]")
+    st.subheader(":red[Giải thích & Hướng dẫn]")
     
-    # Hiển thị hình ảnh quy_trinh.png
     try:
         st.image(QUY_TRINH_PATH, use_container_width=True)
     except FileNotFoundError:
         st.warning("quy_trinh.png không tìm thấy.")
 
-    # Giải thích về kiểm soát rủi ro
     st.markdown("""
     ### Giải thích về kiểm soát rủi ro đo bằng cách penalty thêm rủi ro đuôi (tail risk penalty) dựa trên CVaR vào mô hình của chúng tôi
 
-     **Vấn đề**
+    **Vấn đề**
 
     Trong giao dịch chứng khoán, một chiến lược có thể tạo lợi nhuận trung bình cao, nhưng lại rất dễ thua lỗ nặng trong những ngày xấu nhất.
     Ví dụ:
-    Bình thường mỗi ngày bạn lời +1%.
-    Nhưng thỉnh thoảng lại có ngày lỗ tận -20%.
-    Nếu chỉ nhìn trung bình thì thấy “ổn”, nhưng rủi ro thật sự lại nằm ở đuôi phân phối lợi nhuận – tức những ngày cực kỳ xấu.
+    - Bình thường mỗi ngày bạn lời +1%.
+    - Nhưng thỉnh thoảng lại có ngày lỗ tận -20%.
+    - Nếu chỉ nhìn trung bình thì thấy “ổn”, nhưng rủi ro thật sự lại nằm ở đuôi phân phối lợi nhuận – tức những ngày cực kỳ xấu.
 
-     **VaR (Value at Risk)**
+    **VaR (Value at Risk)**
 
-    VaR (5%) nghĩa là: trong 100 ngày giao dịch, có 5 ngày tệ nhất thì lỗ sẽ không vượt quá một mức nào đó.
-    Ví dụ: VaR 5% = -10% ⇒ 95 ngày bình thường thì lỗ không quá 10%.
+    - VaR (5%) nghĩa là: trong 100 ngày giao dịch, có 5 ngày tệ nhất thì lỗ sẽ không vượt quá một mức nào đó.
+    - Ví dụ: VaR 5% = -10% ⇒ 95 ngày bình thường thì lỗ không quá 10%.
 
-     **CVaR (Conditional Value at Risk)**
+    **CVaR (Conditional Value at Risk)**
 
-    CVaR đi xa hơn VaR: nó đo mức lỗ trung bình trong những ngày tệ nhất.
-    Ví dụ: nếu 5 ngày tệ nhất lần lượt lỗ: -10%, -12%, -15%, -18%, -20%
-    VaR 5% = -10%
-    CVaR 5% = (-12% -15% -18% -20%) / 4 = -16.25%
-    👉 Tức là, nếu rơi vào “vùng rủi ro đuôi”, bạn trung bình sẽ lỗ 16.25%, nặng hơn nhiều so với chỉ nhìn VaR.
+    - CVaR đi xa hơn VaR: nó đo mức lỗ trung bình trong những ngày tệ nhất.
+    - Ví dụ: nếu 5 ngày tệ nhất lần lượt lỗ: -10%, -12%, -15%, -18%, -20%
+    - VaR 5% = -10%
+    - CVaR 5% = (-12% -15% -18% -20%) / 4 = -16.25%
+    - 👉 Tức là, nếu rơi vào “vùng rủi ro đuôi”, bạn trung bình sẽ lỗ 16.25%, nặng hơn nhiều so với chỉ nhìn VaR.
 
-     **Tail Risk Penalty trong code**
+    **Tail Risk Penalty trong code**
+
     Trong môi trường giao dịch này:
-    Mỗi bước, hệ thống tính lợi nhuận tài khoản.
-    Sau đó ước tính CVaR trong một khoảng thời gian gần đây (ví dụ 30 ngày). Nếu CVaR cho thấy có nguy cơ thua lỗ lớn ở đuôi phân phối, thì phần thưởng (reward) sẽ bị trừ thêm một khoản penalty. Nói cách khác:
-    - Chiến lược nào kiếm lời đều nhưng hay gặp cú sập mạnh ⇒ sẽ bị phạt nặng.
-    - Chiến lược nào ổn định, ít rủi ro đuôi ⇒ được thưởng cao hơn.
+    - Mỗi bước, hệ thống tính lợi nhuận tài khoản.
+    - Sau đó ước tính CVaR trong một khoảng thời gian gần đây (ví dụ 30 ngày). Nếu CVaR cho thấy có nguy cơ thua lỗ lớn ở đuôi phân phối, thì phần thưởng (reward) sẽ bị trừ thêm một khoản penalty. Nói cách khác:
+        - Chiến lược nào kiếm lời đều nhưng hay gặp cú sập mạnh ⇒ sẽ bị phạt nặng.
+        - Chiến lược nào ổn định, ít rủi ro đuôi ⇒ được thưởng cao hơn.
 
-     **Ý nghĩa**
+    **Ý nghĩa**
 
     Mục tiêu của penalty này là:
-    Khuyến khích mô hình RL không chỉ chạy theo lợi nhuận trung bình, mà còn tránh những chiến lược liều lĩnh, dễ sập mạnh.
-    Kết quả: mô hình sẽ hướng đến lợi nhuận bền vững, ít cú sốc lớn, giống như cách các quỹ đầu tư chuyên nghiệp quản trị rủi ro.
+    - Khuyến khích mô hình RL không chỉ chạy theo lợi nhuận trung bình, mà còn tránh những chiến lược liều lĩnh, dễ sập mạnh.
+    - Kết quả: mô hình sẽ hướng đến lợi nhuận bền vững, ít cú sốc lớn, giống như cách các quỹ đầu tư chuyên nghiệp quản trị rủi ro.
     """)
 
-    # Giải thích về DAPO
     st.markdown("""
     ### Giải thích về DAPO
 
-     **Lợi ích của DAPO so với PPO truyền thống**
-    
+    **Lợi ích của DAPO so với PPO truyền thống**
+
     1. **Dynamic Sampling (lấy nhiều hành động thay vì một)**
 
-    Trong PPO truyền thống: mỗi trạng thái (state) chỉ được lấy một hành động rồi huấn luyện.
-    Trong DAPO: mỗi trạng thái có thể sinh ra nhiều hành động khác nhau từ cùng một policy, rồi so sánh với nhau.
+    - Trong PPO truyền thống: mỗi trạng thái (state) chỉ được lấy một hành động rồi huấn luyện.
+    - Trong DAPO: mỗi trạng thái có thể sinh ra nhiều hành động khác nhau từ cùng một policy, rồi so sánh với nhau.
 
     👉 Lợi ích:
-    
-    Mô hình hiểu rõ hơn hành động nào tốt hơn trong cùng một hoàn cảnh.
-    Giảm sự “may rủi” do ngẫu nhiên (random action).
-    Học nhanh hơn và ổn định hơn.
+    - Mô hình hiểu rõ hơn hành động nào tốt hơn trong cùng một hoàn cảnh.
+    - Giảm sự “may rủi” do ngẫu nhiên (random action).
+    - Học nhanh hơn và ổn định hơn.
 
     2. **Group Advantage (so sánh trong nhóm hành động)**
 
-    PPO chỉ tính lợi thế (advantage) so với baseline chung.
-    DAPO tính lợi thế tương đối giữa các hành động trong cùng một trạng thái.
+    - PPO chỉ tính lợi thế (advantage) so với baseline chung.
+    - DAPO tính lợi thế tương đối giữa các hành động trong cùng một trạng thái.
 
     👉 Lợi ích:
-
-    Hành động tốt hơn trong nhóm sẽ được “khuyến khích mạnh”, còn hành động kém thì “bị phạt rõ ràng”.
-    Giúp policy học ra đường đi chính xác hơn, tránh bị mơ hồ.
+    - Hành động tốt hơn trong nhóm sẽ được “khuyến khích mạnh”, còn hành động kém thì “bị phạt rõ ràng”.
+    - Giúp policy học ra đường đi chính xác hơn, tránh bị mơ hồ.
 
     3. **Decoupled Clipping (tách biên trên/dưới khi update)**
-    PPO gốc dùng một hệ số kẹp (clipping) ±ε để tránh update quá đà.
-    DAPO tách riêng ngưỡng trên và ngưỡng dưới (epsilon_high, epsilon_low).
+
+    - PPO gốc dùng một hệ số kẹp (clipping) ±ε để tránh update quá đà.
+    - DAPO tách riêng ngưỡng trên và ngưỡng dưới (epsilon_high, epsilon_low).
 
     👉 Lợi ích:
-
-    Kiểm soát tốt hơn khi nào nên “giới hạn update” (khi lợi thế quá cao hoặc quá thấp).
-    Tránh hiện tượng policy “ngừng học” do clipping quá chặt.
-    Linh hoạt hơn cho các thị trường biến động mạnh như chứng khoán.
+    - Kiểm soát tốt hơn khi nào nên “giới hạn update” (khi lợi thế quá cao hoặc quá thấp).
+    - Tránh hiện tượng policy “ngừng học” do clipping quá chặt.
+    - Linh hoạt hơn cho các thị trường biến động mạnh như chứng khoán.
 
     4. **Tích hợp Risk và Sentiment**
 
-    DAPO không chỉ dựa vào lợi nhuận mà còn dùng thêm risk penalty và sentiment boost.
-    Reward được điều chỉnh thông minh:
-    Risk cao → bị phạt.
-    Sentiment tích cực → được thưởng thêm.
+    - DAPO không chỉ dựa vào lợi nhuận mà còn dùng thêm risk penalty và sentiment boost.
+    - Reward được điều chỉnh thông minh:
+        - Risk cao → bị phạt.
+        - Sentiment tích cực → được thưởng thêm.
 
     👉 Lợi ích:
-
-    Giúp mô hình thực tế hơn khi áp dụng vào tài chính (vì ngoài lợi nhuận, nhà đầu tư thật cũng cân nhắc rủi ro và tâm lý thị trường).
-    Tránh chiến lược liều lĩnh kiểu “cờ bạc”.
+    - Giúp mô hình thực tế hơn khi áp dụng vào tài chính (vì ngoài lợi nhuận, nhà đầu tư thật cũng cân nhắc rủi ro và tâm lý thị trường).
+    - Tránh chiến lược liều lĩnh kiểu “cờ bạc”.
 
     5. **Huấn luyện song song (MPI + GPU)**
 
-    DAPO hỗ trợ huấn luyện nhiều process (multi-core, multi-GPU).
-    Đồng bộ tham số tự động qua MPI.
+    - DAPO hỗ trợ huấn luyện nhiều process (multi-core, multi-GPU).
+    - Đồng bộ tham số tự động qua MPI.
 
     👉 Lợi ích:
-
-    Học nhanh hơn, xử lý được khối lượng dữ liệu tài chính lớn.
-
-    Thích hợp khi backtest trên hàng chục năm dữ liệu hoặc nhiều thị trường.
+    - Học nhanh hơn, xử lý được khối lượng dữ liệu tài chính lớn.
+    - Thích hợp khi backtest trên hàng chục năm dữ liệu hoặc nhiều thị trường.
     """)
+```
