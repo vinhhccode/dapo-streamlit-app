@@ -1,4 +1,3 @@
-học thêm đoạn code sau: 
 from __future__ import annotations
 
 import numpy as np
