@@ -20,4 +20,7 @@ openpyxl
 scipy
 tqdm
 alpha_vantage==2.3.1
+transformers
+underthesea
+vncorenlp
 git+https://github.com/AI4Finance-Foundation/FinRL.git
