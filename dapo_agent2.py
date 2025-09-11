@@ -722,39 +722,76 @@ def add_bg_from_local(image_file):
             .stApp {{
                 background-image: url(data:image/png;base64,{encoded});
                 background-size: cover;
-                background-color: rgba(255, 255, 255, 0.7);
-                background-blend-mode: overlay;
+                background-color: rgba(255, 255, 255, 0.3); /* Reduced opacity for sharper background */
+                background-blend-mode: lighten; /* Changed to lighten for clearer background */
             }}
             .custom-title {{
-                color: #F05454; font-weight: 800;
+                color: #00D4FF; /* Electric blue for a techy feel */
+                font-family: 'Orbitron', sans-serif; /* Futuristic font */
+                font-weight: 700;
+                text-shadow: 0 0 10px rgba(0, 212, 255, 0.7); /* Neon glow effect */
             }}
             .stMarkdown, .stText {{
-                color: #30475E !important;
+                color: #E6E6FA !important; /* Light lavender for text readability */
             }}
             .stButton > button {{
                 font-weight: bold !important;
                 font-size: 20px !important;
-                color: #000000 !important;
-                border: 2px solid #000000 !important;
+                color: #00D4FF !important; /* Electric blue text */
+                background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent dark background */
+                border: 2px solid #00D4FF !important; /* Neon blue border */
                 border-radius: 5px !important;
                 transition: all 0.3s ease !important;
+                box-shadow: 0 0 8px rgba(0, 212, 255, 0.5); /* Subtle glow */
             }}
             .stButton > button:hover {{
-                background-color: #000000 !important;
-                color: white !important;
+                background-color: #00D4FF !important; /* Neon blue on hover */
+                color: #000000 !important;
+                box-shadow: 0 0 12px rgba(0, 212, 255, 0.8); /* Stronger glow on hover */
             }}
             .stDateInput > label {{
                 font-size: 20px !important;
                 font-weight: bold !important;
-                color: #000000 !important;
+                color: #00D4FF !important; /* Electric blue for labels */
+                font-family: 'Roboto Mono', monospace; /* Techy font for labels */
+            }}
+            /* Sidebar Styling */
+            [data-testid="stSidebar"] {{
+                background-color: rgba(0, 0, 50, 0.9); /* Dark navy semi-transparent background */
+                border-right: 2px solid #00D4FF; /* Neon blue border */
+                box-shadow: 0 0 10px rgba(0, 212, 255, 0.5); /* Sidebar glow */
+            }}
+            [data-testid="stSidebar"] .stRadio > label {{
+                font-family: 'Roboto Mono', monospace; /* Techy font */
+                color: #E6E6FA; /* Light lavender text */
+                font-size: 18px;
+                padding: 10px;
+                border-radius: 5px;
+                background: linear-gradient(45deg, rgba(0, 212, 255, 0.2), rgba(0, 0, 50, 0.2)); /* Gradient background */
+                transition: all 0.3s ease;
+            }}
+            [data-testid="stSidebar"] .stRadio > label:hover {{
+                background: linear-gradient(45deg, rgba(0, 212, 255, 0.5), rgba(0, 0, 50, 0.5)); /* Brighter gradient on hover */
+                color: #FFFFFF;
+                box-shadow: 0 0 8px rgba(0, 212, 255, 0.7); /* Hover glow */
+            }}
+            [data-testid="stSidebar"] .stRadio > label > div > input:checked + div {{
+                background-color: #00D4FF !important; /* Neon blue for selected radio */
+                border-color: #FFFFFF !important;
             }}
             </style>
             """,
             unsafe_allow_html=True,
         )
+        # Add Google Fonts for techy fonts
+        st.markdown(
+            """
+            <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+            """,
+            unsafe_allow_html=True,
+        )
     except FileNotFoundError:
         st.warning("Hình nền không tìm thấy. Vui lòng kiểm tra file `background.png`.")
-
 add_bg_from_local(BACKGROUND_PATH)
 
 # SIDEBAR
