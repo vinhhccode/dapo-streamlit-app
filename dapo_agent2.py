@@ -781,10 +781,16 @@ def add_bg_from_local(image_file):
                 background-color: #00D4FF !important; /* Neon xanh lam cho radio được chọn */
                 border-color: #FFFFFF !important; /* Viền trắng */
             }}
-            /* Đảm bảo chữ trong bảng và thông báo lỗi rõ ràng */
-            .stTable, .stError, .stSuccess, .stWarning, .stInfo {{
+            /* Đảm bảo chữ trong bảng và thông báo rõ ràng */
+            .stTable, .stError, .stWarning, .stInfo {{
                 color: #FFFFFF !important;
                 text-shadow: 0 0 4px rgba(0, 212, 255, 0.6), 0 0 1px rgba(0, 0, 0, 0.5);
+            }}
+            /* Cụ thể cho thông báo success */
+            .stSuccess {{
+                color: #FFFFFF !important; /* Trắng sáng cho thông báo success */
+                text-shadow: 0 0 4px rgba(0, 212, 255, 0.6), 0 0 1px rgba(0, 0, 0, 0.5) !important;
+                background-color: rgba(0, 100, 0, 0.7) !important; /* Nền xanh đậm trong suốt để giữ phong cách công nghệ */
             }}
             </style>
             """
