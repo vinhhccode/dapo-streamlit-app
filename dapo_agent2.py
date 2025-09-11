@@ -19,6 +19,10 @@ from scipy.stats import skew, kurtosis
 from finrl.config import INDICATORS
 import os
 from typing import Sequence, Optional
+import re, math, warnings
+from torch.utils.data import Dataset, DataLoader
+from transformers import AutoTokenizer, AutoModel
+warnings.filterwarnings("ignore")
 
 # Global device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -709,6 +713,224 @@ def run_backtest(start_date, end_date):
 
     return average_assets, current_dates, metrics, df_allocations
 
+# PhoBERT Model Components
+CKPT_PATH = "./data/best_phobert_multitask.pt"  # Đổi path theo git data
+
+# ENTITY MASKING
+def load_ticker_set():
+    tickers = set()
+    # Giả sử không có TICKER_FILES, hoặc thêm nếu cần
+    return tickers
+
+TICKER_SET = load_ticker_set()
+
+def build_ticker_regex(ticker_set):
+    if not ticker_set: return None
+    escaped = [re.escape(t) for t in sorted(ticker_set, key=len, reverse=True)]
+    pat = r"\b(" + "|".join(escaped) + r")\b"
+    return re.compile(pat)
+
+TICKER_RE = build_ticker_regex(TICKER_SET)
+
+try:
+    from underthesea import ner as uts_ner
+    UTS_OK = True
+except Exception:
+    st.warning("underthesea chưa có, chỉ mask ticker in HOA nếu có.")
+    UTS_OK = False
+
+def mask_entities(text: str) -> str:
+    if not isinstance(text, str) or not text: return ""
+    s = text
+    if TICKER_RE is not None:
+        s = TICKER_RE.sub("<NAME>", s)
+    if UTS_OK:
+        try:
+            tags = uts_ner(s)
+            out_tokens = []
+            i = 0
+            while i < len(tags):
+                token = tags[i][0]
+                ner_tag = str(tags[i][-1])
+                if ner_tag.startswith("B-"):
+                    ent_type = ner_tag[2:]
+                    j = i + 1
+                    while j < len(tags) and str(tags[j][-1]).startswith("I-"):
+                        j += 1
+                    if ent_type in ("PER","ORG"):
+                        out_tokens.append("<NAME>")
+                    elif ent_type == "LOC":
+                        out_tokens.append("<LOC>")
+                    else:
+                        out_tokens.append(token)
+                    i = j
+                else:
+                    if re.fullmatch(r"[A-Z]{2,6}", token):
+                        out_tokens.append("<NAME>")
+                    else:
+                        out_tokens.append(token)
+                    i += 1
+            s = " ".join(out_tokens)
+        except Exception:
+            pass
+    return s
+
+# WORD SEGMENT
+def get_vncorenlp():
+    try:
+        from vncorenlp import VnCoreNLP
+        # Thay path jar nếu cần
+        jar = "VnCoreNLP-1.1.1.jar"  # Giả sử có trong path
+        if not os.path.exists(jar):
+            st.warning("Không tìm thấy VnCoreNLP jar → bỏ qua tách từ.")
+            return None
+        return VnCoreNLP(jar, annotators="wseg", max_heap_size='-Xmx2g')
+    except Exception as e:
+        st.warning(f"Không khởi tạo được VnCoreNLP: {e}")
+        return None
+
+RDR = get_vncorenlp()
+
+def vn_word_segment(rdr, s: str) -> str:
+    if rdr is None: return s
+    try:
+        sents = rdr.tokenize(s)
+        return " ".join(" ".join(tokens) for tokens in sents)
+    except Exception:
+        return s
+
+def preprocess_text(s: str) -> str:
+    s = mask_entities(s)
+    s = vn_word_segment(RDR, s)
+    return s
+
+class NewsDataset(Dataset):
+    def __init__(self, texts, tokenizer, max_length=256):
+        self.texts = texts
+        self.tok = tokenizer
+        self.max_length = max_length
+    def __len__(self): return len(self.texts)
+    def __getitem__(self, i):
+        enc = self.tok(
+            self.texts[i],
+            padding="max_length",
+            truncation=True,
+            max_length=self.max_length,
+            return_tensors="pt"
+        )
+        return {k: v.squeeze(0) for k, v in enc.items()}
+
+class PhoBertMultiHeadMeanMLP(nn.Module):
+    def __init__(self, model_name, num_labels=5, dropout=0.1):
+        super().__init__()
+        self.backbone = AutoModel.from_pretrained(model_name, add_pooling_layer=False)
+        h = self.backbone.config.hidden_size
+        self.dropout = nn.Dropout(dropout)
+        self.mlp = nn.Sequential(
+            nn.Linear(h, h//2), nn.GELU(), nn.Dropout(0.1),
+        )
+        self.head_sent = nn.Linear(h//2, num_labels)
+        self.head_risk = nn.Linear(h//2, num_labels)
+    def forward(self, input_ids, attention_mask):
+        out = self.backbone(input_ids=input_ids, attention_mask=attention_mask)
+        x = out.last_hidden_state
+        mask = attention_mask.unsqueeze(-1).float()
+        pooled = (x * mask).sum(1) / mask.sum(1).clamp_min(1e-6)
+        pooled = self.dropout(pooled)
+        pooled = self.mlp(pooled)
+        return self.head_sent(pooled), self.head_risk(pooled)
+
+class PhoBertMultiHeadCLS(nn.Module):
+    def __init__(self, model_name, num_labels=5, dropout=0.1):
+        super().__init__()
+        self.backbone = AutoModel.from_pretrained(model_name)
+        h = self.backbone.config.hidden_size
+        self.dropout = nn.Dropout(dropout)
+        self.head_sent = nn.Linear(h, num_labels)
+        self.head_risk = nn.Linear(h, num_labels)
+    def forward(self, input_ids, attention_mask):
+        out = self.backbone(input_ids=input_ids, attention_mask=attention_mask)
+        pooled = out.last_hidden_state[:,0,:]
+        pooled = self.dropout(pooled)
+        return self.head_sent(pooled), self.head_risk(pooled)
+
+def load_checkpoint_model(ckpt_path):
+    if not os.path.exists(ckpt_path):
+        st.error(f"Không tìm thấy checkpoint: {ckpt_path}")
+        return None, None
+    ckpt = torch.load(ckpt_path, map_location="cpu")
+
+    if not isinstance(ckpt, dict):
+        raise TypeError("Checkpoint không hợp lệ (mong đợi dict).")
+
+    if "model_name" not in ckpt:
+        raise KeyError("Checkpoint thiếu khoá 'model_name'.")
+
+    model_name = ckpt["model_name"]
+    state = ckpt["state_dict"] if "state_dict" in ckpt else ckpt
+
+    try:
+        model = PhoBertMultiHeadMeanMLP(model_name=model_name).to(device)
+        model.load_state_dict(state, strict=True)
+        variant = "mean+MLP"
+    except Exception:
+        model = PhoBertMultiHeadCLS(model_name=model_name).to(device)
+        model.load_state_dict(state, strict=True)
+        variant = "[CLS]"
+
+    tok = AutoTokenizer.from_pretrained(model_name, use_fast=False)
+    st.info(f"✓ Loaded model: {model_name} ({variant})")
+    return model, tok
+
+@torch.no_grad()
+def predict_multitask(model, loader):
+    model.eval()
+    s_idx_all, s_cf_all, r_idx_all, r_cf_all = [], [], [], []
+    for b in tqdm(loader, desc="Scoring", leave=False):
+        ids = b["input_ids"].to(device); mask = b["attention_mask"].to(device)
+        ls, lr = model(ids, mask)
+        ps = torch.softmax(ls, -1); pr = torch.softmax(lr, -1)
+        s_conf, s_idx = ps.max(-1); r_conf, r_idx = pr.max(-1)
+        s_idx_all.append((s_idx+1).cpu().numpy())
+        s_cf_all.append(s_conf.cpu().numpy())
+        r_idx_all.append((r_idx+1).cpu().numpy())
+        r_cf_all.append(r_conf.cpu().numpy())
+    s_idx = np.concatenate(s_idx_all); s_cf = np.concatenate(s_cf_all)
+    r_idx = np.concatenate(r_idx_all); r_cf = np.concatenate(r_cf_all)
+    return s_idx, s_cf, r_idx, r_cf
+
+def find_text_col(df):
+    TEXT_COL_CANDIDATES = ["lọc", "loc", "text", "Lọc", "LOC", "Text"]
+    for name in TEXT_COL_CANDIDATES:
+        if name in df.columns: return name
+    lowers = {str(c).lower(): c for c in df.columns}
+    for name in [n.lower() for n in TEXT_COL_CANDIDATES]:
+        if name in lowers: return lowers[name]
+    raise ValueError(f"Không thấy cột văn bản. Columns: {list(df.columns)}")
+
+def score_excel(df, model, tokenizer, max_length=256, batch_size=32):
+    text_col = find_text_col(df)
+    raw_texts = df[text_col].astype(str).fillna("").tolist()
+
+    texts = [preprocess_text(t) for t in tqdm(raw_texts, desc="Preprocess")]
+
+    ds = NewsDataset(texts, tokenizer, max_length=max_length)
+    dl = DataLoader(ds, batch_size=batch_size, shuffle=False)
+
+    s_pred, s_conf, r_pred, r_conf = predict_multitask(model, dl)
+
+    df_out = df.copy()
+    df_out["llm_sentiment"] = s_pred.astype(int)
+    df_out["llm_risk"] = r_pred.astype(int)
+    return df_out
+
+def predict_single_text(text, model, tokenizer, max_length=256):
+    processed = preprocess_text(text)
+    ds = NewsDataset([processed], tokenizer, max_length)
+    dl = DataLoader(ds, batch_size=1, shuffle=False)
+    s_pred, _, r_pred, _ = predict_multitask(model, dl)
+    return s_pred[0], r_pred[0]
+
 # Config
 st.set_page_config(
     page_title="DAPO_APP news signals and CVAR",
@@ -822,11 +1044,15 @@ if "page" not in st.session_state:
     st.session_state.page = "Main"
 if "backtest_run" not in st.session_state:
     st.session_state.backtest_run = False
+if "phobert_model" not in st.session_state:
+    st.session_state.phobert_model = None
+if "phobert_tokenizer" not in st.session_state:
+    st.session_state.phobert_tokenizer = None
 
 choice = st.sidebar.radio(
     "MENU",
-    ["Main", "Explain & Guide"],
-    index=["Main", "Explain & Guide"].index(st.session_state.page) if st.session_state.page in ["Main", "Explain & Guide"] else 0,
+    ["Main", "News Signals", "Explain & Guide"],
+    index=["Main", "News Signals", "Explain & Guide"].index(st.session_state.page) if st.session_state.page in ["Main", "News Signals", "Explain & Guide"] else 0,
 )
 st.session_state.page = choice
 st.sidebar.markdown("---")
@@ -951,6 +1177,57 @@ if st.session_state.page == "Main":
         st.dataframe(st.session_state.df_allocations)
 
         plot_final_allocation_treemap(st.session_state.df_allocations, "DAPO (Cvar 0.01 Phobert 1a.3b)")
+
+elif st.session_state.page == "News Signals":
+    st.subheader(":red[News Signals - Dự đoán Sentiment và Risk]")
+    
+    # Load model một lần
+    if st.session_state.phobert_model is None or st.session_state.phobert_tokenizer is None:
+        with st.spinner("Đang tải mô hình PhoBERT..."):
+            model, tokenizer = load_checkpoint_model(CKPT_PATH)
+            if model and tokenizer:
+                st.session_state.phobert_model = model
+                st.session_state.phobert_tokenizer = tokenizer
+            else:
+                st.error("Không thể tải mô hình.")
+                st.stop()
+
+    model = st.session_state.phobert_model
+    tokenizer = st.session_state.phobert_tokenizer
+
+    tab1, tab2 = st.tabs(["Dự đoán từ nội dung văn bản", "Dự đoán từ file Excel"])
+
+    with tab1:
+        st.markdown("Nhập nội dung văn bản để dự đoán sentiment và risk.")
+        text_input = st.text_area("Nội dung văn bản:", height=200)
+        if st.button("Dự đoán"):
+            if text_input:
+                with st.spinner("Đang xử lý..."):
+                    sentiment, risk = predict_single_text(text_input, model, tokenizer)
+                    st.success(f"Sentiment: {sentiment} | Risk: {risk}")
+            else:
+                st.warning("Vui lòng nhập nội dung.")
+
+    with tab2:
+        st.markdown("Tải lên file Excel để chấm điểm toàn bộ dữ liệu.")
+        uploaded_file = st.file_uploader("Chọn file Excel", type=["xlsx"])
+        if uploaded_file:
+            df = pd.read_excel(uploaded_file)
+            if st.button("Chấm điểm"):
+                with st.spinner("Đang xử lý file..."):
+                    try:
+                        df_out = score_excel(df, model, tokenizer)
+                        st.success("Xử lý hoàn tất!")
+                        st.dataframe(df_out.head())
+
+                        # Download kết quả
+                        output = pd.ExcelWriter("scored.xlsx")
+                        df_out.to_excel(output, index=False)
+                        output.save()
+                        with open("scored.xlsx", "rb") as f:
+                            st.download_button("Tải file kết quả", f, file_name="scored.xlsx")
+                    except Exception as e:
+                        st.error(f"Lỗi: {e}")
 
 elif st.session_state.page == "Explain & Guide":
     st.subheader(":red[Giải thích & Hướng dẫn]")
