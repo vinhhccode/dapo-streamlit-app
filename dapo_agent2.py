@@ -1053,4 +1053,3 @@ elif st.session_state.page == "Explain & Guide":
     - Học nhanh hơn, xử lý được khối lượng dữ liệu tài chính lớn.
     - Thích hợp khi backtest trên hàng chục năm dữ liệu hoặc nhiều thị trường.
     """)
-```
