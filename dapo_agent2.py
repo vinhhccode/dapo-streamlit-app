@@ -716,85 +716,74 @@ def add_bg_from_local(image_file):
     try:
         with open(image_file, "rb") as f:
             encoded = base64.b64encode(f.read()).decode()
-        css = f"""
+        st.markdown(
+            f"""
             <style>
             .stApp {{
                 background-image: url(data:image/png;base64,{encoded});
                 background-size: cover;
-                background-color: rgba(255, 255, 255, 0.3); /* Lớp phủ nhẹ để nền rõ hơn */
-                background-blend-mode: lighten; /* Giữ nền sắc nét */
+                background-color: rgba(255, 255, 255, 0.5); /* Reduced opacity for sharper background */
+                background-blend-mode: lighten; /* Changed to lighten for clearer background */
             }}
             .custom-title {{
-                color: #FFFFFF; /* Trắng sáng */
-                font-family: 'Orbitron', sans-serif; /* Font công nghệ */
+                color: #00D4FF; /* Electric blue for a techy feel */
+                font-family: 'Orbitron', sans-serif; /* Futuristic font */
                 font-weight: 700;
-                text-shadow: 0 0 8px rgba(0, 212, 255, 0.8), 0 0 2px rgba(0, 0, 0, 0.6); /* Viền neon + đen */
+                text-shadow: 0 0 10px rgba(0, 212, 255, 0.7); /* Neon glow effect */
             }}
             .stMarkdown, .stText {{
-                color: #FFFFFF !important; /* Trắng sáng cho nội dung */
-                text-shadow: 0 0 4px rgba(0, 212, 255, 0.6), 0 0 1px rgba(0, 0, 0, 0.5); /* Viền neon nhẹ */
+                color: #E6E6FA !important; /* Light lavender for text readability */
             }}
             .stButton > button {{
                 font-weight: bold !important;
                 font-size: 20px !important;
-                color: #FFFFFF !important; /* Chữ trắng */
-                background-color: rgba(0, 0, 50, 0.8); /* Xanh lam đậm trong suốt */
-                border: 2px solid #00D4FF !important; /* Viền neon xanh lam */
+                color: #00D4FF !important; /* Electric blue text */
+                background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent dark background */
+                border: 2px solid #00D4FF !important; /* Neon blue border */
                 border-radius: 5px !important;
                 transition: all 0.3s ease !important;
-                box-shadow: 0 0 8px rgba(0, 212, 255, 0.5); /* Hiệu ứng phát sáng */
+                box-shadow: 0 0 8px rgba(0, 212, 255, 0.5); /* Subtle glow */
             }}
             .stButton > button:hover {{
-                background-color: #00D4FF !important; /* Neon xanh lam khi hover */
-                color: #000000 !important; /* Chữ đen khi hover */
-                box-shadow: 0 0 12px rgba(0, 212, 255, 0.8); /* Phát sáng mạnh hơn */
+                background-color: #00D4FF !important; /* Neon blue on hover */
+                color: #000000 !important;
+                box-shadow: 0 0 12px rgba(0, 212, 255, 0.8); /* Stronger glow on hover */
             }}
             .stDateInput > label {{
                 font-size: 20px !important;
                 font-weight: bold !important;
-                color: #FFFFFF !important; /* Trắng sáng */
-                font-family: 'Roboto Mono', monospace; /* Font công nghệ */
-                text-shadow: 0 0 4px rgba(0, 212, 255, 0.6); /* Viền neon */
+                color: #00D4FF !important; /* Electric blue for labels */
+                font-family: 'Roboto Mono', monospace; /* Techy font for labels */
             }}
             /* Sidebar Styling */
             [data-testid="stSidebar"] {{
-                background-color: rgba(0, 0, 50, 0.9); /* Xanh lam đậm trong suốt */
-                border-right: 2px solid #00D4FF; /* Viền neon xanh lam */
-                box-shadow: 0 0 10px rgba(0, 212, 255, 0.5); /* Phát sáng sidebar */
+                background-color: rgba(0, 0, 50, 0.9); /* Dark navy semi-transparent background */
+                border-right: 2px solid #00D4FF; /* Neon blue border */
+                box-shadow: 0 0 10px rgba(0, 212, 255, 0.5); /* Sidebar glow */
             }}
             [data-testid="stSidebar"] .stRadio > label {{
-                font-family: 'Roboto Mono', monospace; /* Font công nghệ */
-                color: #FFFFFF; /* Trắng sáng */
+                font-family: 'Roboto Mono', monospace; /* Techy font */
+                color: #E6E6FA; /* Light lavender text */
                 font-size: 18px;
                 padding: 10px;
                 border-radius: 5px;
-                background: linear-gradient(45deg, rgba(0, 212, 255, 0.3), rgba(0, 0, 50, 0.3)); /* Gradient công nghệ */
+                background: linear-gradient(45deg, rgba(0, 212, 255, 0.2), rgba(0, 0, 50, 0.2)); /* Gradient background */
                 transition: all 0.3s ease;
-                text-shadow: 0 0 4px rgba(0, 212, 255, 0.6); /* Viền neon */
             }}
             [data-testid="stSidebar"] .stRadio > label:hover {{
-                background: linear-gradient(45deg, rgba(0, 212, 255, 0.6), rgba(0, 0, 50, 0.6)); /* Gradient sáng hơn khi hover */
+                background: linear-gradient(45deg, rgba(0, 212, 255, 0.5), rgba(0, 0, 50, 0.5)); /* Brighter gradient on hover */
                 color: #FFFFFF;
-                box-shadow: 0 0 8px rgba(0, 212, 255, 0.7); /* Phát sáng khi hover */
+                box-shadow: 0 0 8px rgba(0, 212, 255, 0.7); /* Hover glow */
             }}
             [data-testid="stSidebar"] .stRadio > label > div > input:checked + div {{
-                background-color: #00D4FF !important; /* Neon xanh lam cho radio được chọn */
-                border-color: #FFFFFF !important; /* Viền trắng */
-            }}
-            /* Đảm bảo chữ trong bảng và thông báo rõ ràng */
-            .stTable, .stError, .stWarning, .stInfo {{
-                color: #FFFFFF !important;
-                text-shadow: 0 0 4px rgba(0, 212, 255, 0.6), 0 0 1px rgba(0, 0, 0, 0.5);
-            }}
-            /* Cụ thể cho thông báo success */
-            .stSuccess {{
-                color: #FFFFFF !important; /* Trắng sáng cho thông báo success */
-                text-shadow: 0 0 4px rgba(0, 212, 255, 0.6), 0 0 1px rgba(0, 0, 0, 0.5) !important;
-                background-color: rgba(0, 100, 0, 0.7) !important; /* Nền xanh đậm trong suốt để giữ phong cách công nghệ */
+                background-color: #00D4FF !important; /* Neon blue for selected radio */
+                border-color: #FFFFFF !important;
             }}
             </style>
-            """
-        st.markdown(css, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True,
+        )
+        # Add Google Fonts for techy fonts
         st.markdown(
             """
             <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
