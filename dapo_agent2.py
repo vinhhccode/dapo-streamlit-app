@@ -837,7 +837,7 @@ try:
 except FileNotFoundError:
     st.warning("Banner không tìm thấy. Vui lòng kiểm tra file `banner.png`.")
 
-st.markdown('<h1 class="custom-title">Ứng dụng Mô hình Học Sâu Tăng Cường Tích hợp Tín hiệu Tin tức và Phòng ngừa Rủi ro Đuôi trong Quản lý Danh mục Đầu tư trên Thị trường Chứng khoán Việt Nam</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="custom-title">ỨNG DỤNG MÔ HÌNH HỌC TĂNG CƯỜNG SÂU TÍCH HỢP TÍN HIỆU TIN TỨC VÀ PHÒNG NGỪA RỦI RO ĐUÔI TRONG QUẢN LÝ DANH MỤC ĐẦU TƯ TRÊN THỊ TRƯỜNG CHỨNG KHOÁN VIỆT NAM</h1>', unsafe_allow_html=True)
 
 # MAIN CONTENT
 if st.session_state.page == "Main":
