@@ -591,7 +591,7 @@ def run_backtest(start_date, end_date):
         df.dropna(subset=['date'], inplace=True)
 
     # Gộp dữ liệu từ PAST_DATA_PATH với trade_risk và trade_sent
-    # Đảm bảo các cột cần thiết có mặt
+   
     base_cols = ["date", "tic", "close"] + INDICATORS
     for df in (trade_risk, trade_sent, past_data):
         for col in base_cols:
